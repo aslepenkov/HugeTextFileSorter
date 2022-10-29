@@ -17,7 +17,22 @@ public class FileSorter
         if (!File.Exists(InputPath))
             return false;
 
-        
+        //DUMBSORT
+        var lines = File.ReadAllLines(InputPath);
+        var sortedLines = lines
+            .OrderBy(l => l.Split('.')[1])
+            .ThenBy(l => l.Split('.')[0])
+            .ToArray();
+
+        using (var stream = new FileStream(OutputPath, FileMode.CreateNew))
+        using (var bs = new BufferedStream(stream))
+        using (var writer = new StreamWriter(bs))
+        {
+            foreach (var line in sortedLines)
+            {
+                writer.WriteLine(line);
+            }
+        }
 
         return true;
     }

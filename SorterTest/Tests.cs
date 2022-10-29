@@ -30,9 +30,9 @@ public class Tests
     }
 
     [TestCase(10)]
-    [TestCase(100)]
-    [TestCase(1000)]
-    [TestCase(5000)]
+    //[TestCase(100)]
+    //[TestCase(1000)]
+    //[TestCase(5000)]
     //[TestCase(10000)]
     public void WriterCreatesExactSizeTest(int prefferedMBytes)
     {
