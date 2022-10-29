@@ -2,8 +2,8 @@ namespace SorterTest;
 
 public class Tests
 {
-    private const string TestOutputDir = "testoutput";
-    private const bool WIPE_ARTIFACTS = false;
+    private const string TestOutputDir = "testoutput_wiped";
+    private const bool WIPE_ARTIFACTS = true;
 
     [SetUp]
     public void Setup()
@@ -46,6 +46,27 @@ public class Tests
         var factMBytes = fi.Length / 1024 / 1024;
 
         Assert.IsTrue(Math.Abs(factMBytes - prefferedMBytes) < 1000);// +/- 1КB accuracy
+    }
+
+    [Test]
+    public void WriterOutputContainsSameStringsTest()
+    {
+        var size = 1;//MBytes
+        var path = Path.Combine(TestOutputDir, "unsorted_samestrings.txt");
+
+        var fw = new FileWriter(path, size);
+        var res = fw.GenerateFile();
+
+        Assert.IsTrue(res); // File Created
+
+        var lines = File.ReadLines(path).ToList<string>();
+
+        var dublicates = lines.Select(l => l.Split('.')[1])
+            .GroupBy(str => str)
+            .Where(grp => grp.Count() > 2)
+            .Select(str => str);
+
+        Assert.Greater(dublicates.Count(), 0);
     }
 
     [TearDown]
