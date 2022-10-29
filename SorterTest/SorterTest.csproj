@@ -20,4 +20,10 @@
     <ProjectReference Include="..\SorterCore\SorterCore.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="testdata\*.*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>  
+  </ItemGroup>
+
 </Project>
