@@ -59,7 +59,7 @@ public class Tests
 
         Assert.IsTrue(res); // File Created
 
-        var lines = File.ReadLines(path).ToList<string>();
+        var lines = File.ReadLines(path);
 
         var dublicates = lines.Select(l => l.Split('.')[1])
             .GroupBy(str => str)
@@ -67,6 +67,26 @@ public class Tests
             .Select(str => str);
 
         Assert.Greater(dublicates.Count(), 0);
+    }
+
+    [TestCase("unsorted.txt", "sorted.txt")]
+    public void SorterTest(string unsortedFileName, string sortedrefFileName)
+    {
+        var inputPath = Path.Combine("testdata", unsortedFileName);
+        var outputRefPath = Path.Combine("testdata", sortedrefFileName);
+        var outputResPath = Path.Combine(TestOutputDir, "sorted_res.txt");
+
+        var fs = new FileSorter(inputPath, outputResPath);
+        var res = fs.SortFile();
+
+        Assert.IsTrue(res); // File Created
+
+        var linesRes = File.ReadAllBytes(outputResPath);
+        var linesRef = File.ReadAllBytes(outputRefPath);
+
+        Assert.AreEqual(linesRef.Length, linesRes.Length); //Same length
+
+        Assert.AreEqual(linesRef.Take(1000), linesRes.Take(1000)); //Same first 1000 bytes
     }
 
     [TearDown]

@@ -17,7 +17,7 @@ public class FileSorter
         if (!File.Exists(InputPath))
             return false;
 
-
+        
 
         return true;
     }
