@@ -7,16 +7,19 @@ var unsortedFilePath = Path.Combine(TestOutputDir, "unsorted.txt");
 var sortedFilePath = $"{unsortedFilePath}.sorted";
 
 
-
+var buff = 1024;
+var createNew = true;
+var size = 10;
+var pool = 50;
 //args sorter.exe y 1000 1024 
 //args sorter.exe n 1024 
-var buff = 1024;
-var createNew = args[0].Equals("y");
-var size = createNew ? Int32.Parse(args[1]) : 1000;
-var pool = 1;
-
-Int32.TryParse(args[createNew ? 2 : 1], out buff);
-Int32.TryParse(args[createNew ? 3 : 2], out pool);
+if (args.Length != 0)
+{
+    createNew = args[0].Equals("y");
+    size = createNew ? Int32.Parse(args[1]) : size;
+    Int32.TryParse(args[createNew ? 2 : 1], out buff);
+    Int32.TryParse(args[createNew ? 3 : 2], out pool);
+}
 
 Console.WriteLine($"Sorter.exe| File size: {size} MB. Chunks: {buff} lines. Pool: {pool} tasks");
 
@@ -38,6 +41,9 @@ if (createNew)
 }
 else
 {
+    if (File.Exists(sortedFilePath))
+        File.Delete(sortedFilePath);
+
     Console.WriteLine(@"(default: output\unsorted.txt)");
 }
 var sw = new Stopwatch();

@@ -38,20 +38,21 @@ public class FileSorter
         for (var i = 0; i < POOL_SIZE; i++)
         {
             sortTaskPool[i] = Task.Run(SortChunks);
+            msortTaskPool[i] = Task.Run(() =>
+            {
+                SortMerge();
+            });
         }
-
-
-        var msort = Task.Run(SortMerge);
 
         Task.WaitAll(splitTask);
         Task.WaitAll(sortTaskPool);
-        Task.WaitAll(msort);
-        //SortMerge chunks
-        //SortMerge();
+        Task.WaitAll(msortTaskPool);
+
+        //final merge
+        SortMerge(true);
 
         return true;
     }
-
     private void SplitInputFile()
     {
         Thread.CurrentThread.Name = "SplitInputFile";
@@ -127,7 +128,7 @@ public class FileSorter
         }
     }
 
-    private void SortMerge()
+    private void SortMerge(bool isSingleThread = false)
     {
         var lc = new LineComparer();
         string? chunk1, chunk2;
@@ -154,7 +155,14 @@ public class FileSorter
             //Queue has 1 last element. => Save results&exit
             if (isSortDone && !string.IsNullOrEmpty(chunk1) && !unmergedChunks.TryPeek(out chunk2))
             {
-                File.Move(chunk1, OutputPath);
+                if (isSingleThread)
+                {
+                    File.Move(chunk1, OutputPath);
+                }
+                else
+                {
+                    unmergedChunks.Enqueue(chunk1);
+                }
                 break;
             }
 
@@ -163,7 +171,7 @@ public class FileSorter
             {
                 var chunkMergeName = Path.Combine(TEMP_DIR, $"{Guid.NewGuid()}.chunkmerge");
 
-                //Console.WriteLine($"Merge_{Thread.CurrentThread.ManagedThreadId} {chunk1} {chunk2}. Total unmerged: {unmergedChunks.Count}");
+                Console.WriteLine($"Merge_{Thread.CurrentThread.ManagedThreadId} {chunk1} {chunk2}. Total unmerged: {unmergedChunks.Count}");
 
                 using (var chunk1sr = new StreamReader(chunk1))
                 using (var chunk2sr = new StreamReader(chunk2))
