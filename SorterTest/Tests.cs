@@ -2,7 +2,7 @@ namespace SorterTest;
 
 public class Tests
 {
-    private const string TestOutputDir = "testoutput_wiped";
+    private const string TestOutputDir = "testoutput";
     private const bool WIPE_ARTIFACTS = true;
 
     [SetUp]
@@ -10,6 +10,9 @@ public class Tests
     {
         var currDir = Directory.GetCurrentDirectory();
         var fullpath = Path.Combine(currDir, TestOutputDir);
+
+        if (WIPE_ARTIFACTS && Directory.Exists(fullpath))
+            Directory.Delete(fullpath, recursive: true);
 
         if (!Directory.Exists(fullpath))
             Directory.CreateDirectory(fullpath);
@@ -69,6 +72,38 @@ public class Tests
         Assert.Greater(dublicates.Count(), 0);
     }
 
+    [TestCase(1)]
+    [TestCase(10)]
+    [TestCase(100)]
+    [TestCase(1000)]
+    [TestCase(10000)]
+    [TestCase(100000)]
+    public void SorterFirstNLinesTest(int linesCount)
+    {
+        var size = 10;//MBytes
+        var path = Path.Combine(TestOutputDir, "unsorted_lines.txt");
+        var resPath = Path.Combine(TestOutputDir, "sorted_lines.txt");
+
+        var fw = new FileWriter(path, size);
+        var fs = new FileSorter(path, resPath);
+
+        var isCreated = fw.GenerateFile();
+        Assert.IsTrue(isCreated); // File Created
+
+        var isSorted = fs.SortFile();
+        Assert.IsTrue(isSorted); // File sorted
+
+        var linesRef = File.ReadAllLines(path);
+        var sortedRefLines = linesRef
+            .OrderBy(l => l.Split('.')[1])
+            .ThenBy(l => l.Split('.')[0])
+            .ToArray();
+
+        var linesRes = File.ReadAllLines(resPath).Take(linesCount);
+
+        Assert.AreEqual(sortedRefLines.Take(linesCount), linesRes.Take(linesCount));
+    }
+
     [TestCase("unsorted.txt", "sorted.txt")]
     public void SorterTest(string unsortedFileName, string sortedrefFileName)
     {
@@ -77,16 +112,28 @@ public class Tests
         var outputResPath = Path.Combine(TestOutputDir, "sorted_res.txt");
 
         var fs = new FileSorter(inputPath, outputResPath);
-        var res = fs.SortFile();
+        var isSorted = fs.SortFile();
 
-        Assert.IsTrue(res); // File Created
+        Assert.IsTrue(isSorted); // File sorted
 
-        var linesRes = File.ReadAllBytes(outputResPath);
-        var linesRef = File.ReadAllBytes(outputRefPath);
+        var linesRef = File.ReadAllBytes(outputRefPath).ToArray();
+        var linesRes = File.ReadAllBytes(outputResPath).ToArray();
 
-        Assert.AreEqual(linesRef.Length, linesRes.Length); //Same length
+        Assert.AreEqual(linesRef, linesRes);
+    }
 
-        Assert.AreEqual(linesRef.Take(1000), linesRes.Take(1000)); //Same first 1000 bytes
+    [TestCase("1.Apple", "415.Apple", -1)]
+    [TestCase("415.Apple", "2.Banana is yellow", -1)]
+    [TestCase("2.Banana is yellow", "32.Cherry is the best", -1)]
+    [TestCase("32.Cherry is the best", "30432.Something something something", -1)]
+    [TestCase("415.Apple", "1.Apple", 1)]
+    [TestCase("2.Banana is yellow", "415.Apple", 1)]
+    [TestCase("32.Cherry is the best", "2.Banana is yellow", 1)]
+    [TestCase("30432.Something something something", "32.Cherry is the best", 1)]
+    public void SorterCompareLinesTest(string left, string right, int res)
+    {
+        var comparer = new LineComparer();
+        Assert.AreEqual(res, comparer.Compare(left, right));
     }
 
     [TearDown]
@@ -99,6 +146,9 @@ public class Tests
         var fullpath = Path.Combine(currDir, TestOutputDir);
 
         if (Directory.Exists(fullpath))
-            Directory.Delete(fullpath, recursive: true);
+        {
+            Directory.Move(fullpath, $"{fullpath}_del"); //faster rename, then delete
+            Directory.Delete($"{fullpath}_del", recursive: true);
+        }
     }
 }
