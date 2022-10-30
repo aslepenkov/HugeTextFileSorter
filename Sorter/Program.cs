@@ -1,17 +1,32 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
-var TestOutputDir = "output";
-var size = 100;//MBytes
-var unsortedFilePath = Path.Combine(TestOutputDir, "unsorted.txt");
-var sortedFilePath = "${unsortedFilePath}.sorted";
 
-Console.WriteLine(@"Generate new unsorted file? (Y\n)");
+
+var TestOutputDir = "output";
+var unsortedFilePath = Path.Combine(TestOutputDir, "unsorted.txt");
+var sortedFilePath = $"{unsortedFilePath}.sorted";
+
+
+
+//args sorter.exe y 1000 1024 
+//args sorter.exe n 1024 
+var buff = 1024;
+var createNew = args[0].Equals("y");
+var size = createNew ? Int32.Parse(args[1]) : 1000;
+var pool = 1;
+
+Int32.TryParse(args[createNew ? 2 : 1], out buff);
+Int32.TryParse(args[createNew ? 3 : 2], out pool);
+
+Console.WriteLine($"Sorter.exe| File size: {size} MB. Chunks: {buff} lines. Pool: {pool} tasks");
+
+// Console.WriteLine(@"Generate new unsorted file? (Y\n)");
 // var l = Console.ReadLine();
 // size = Int32.Parse(l);
-if (false)
+if (createNew)
 {
     PrepareTestDir(TestOutputDir);
-    Console.WriteLine("Enter size (Default 100MB)");
+    //Console.WriteLine("Enter size (Default 100MB)");
     // var l = Console.ReadLine();
     // size = Int32.Parse(l);
     Console.WriteLine($"{DateTime.UtcNow}|Creating unsorted file...");
@@ -23,17 +38,18 @@ if (false)
 }
 else
 {
-    Console.WriteLine(@"Provide path to unsorted (default: output\unsorted.txt)");
-    // var l = Console.ReadLine();
-    // path = Int32.Parse(l);
+    Console.WriteLine(@"(default: output\unsorted.txt)");
 }
 var sw = new Stopwatch();
 sw.Start();
 
 using (var proc = Process.GetCurrentProcess())
 {
-    Console.WriteLine($"{DateTime.UtcNow}|Sorting file... size: {size} MB");
+    var fi = new FileInfo(unsortedFilePath);
+    Console.WriteLine($"{DateTime.UtcNow}|Sorting file... size: {fi.Length / 1024 / 1024} MB");
     var fs = new FileSorter(unsortedFilePath, sortedFilePath);
+    fs.LINES_PER_CHUNK = buff;
+    fs.POOL_SIZE = pool;
     var isSorted = fs.SortFile();
 
     proc.Refresh();

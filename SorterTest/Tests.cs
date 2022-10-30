@@ -109,7 +109,7 @@ public class Tests
     {
         var inputPath = Path.Combine("testdata", unsortedFileName);
         var outputRefPath = Path.Combine("testdata", sortedrefFileName);
-        var outputResPath = Path.Combine(TestOutputDir, "sorted_res.txt");
+        var outputResPath = Path.Combine(TestOutputDir, "unsorted.txt.sorted");
 
         var fs = new FileSorter(inputPath, outputResPath);
         var isSorted = fs.SortFile();
