@@ -38,6 +38,7 @@ public class FileSorter
         {
             var monitorTask = Task.Run(() =>
             {
+                Console.WriteLine();
                 var val = unsortedChunks.Count + unmergedChunks.Count;
                 while (true)
                 {
@@ -45,7 +46,7 @@ public class FileSorter
 
                     if (val != unsortedChunks.Count + unmergedChunks.Count)
                     {
-                        Console.WriteLine($"QUEUE sort/merge: {unsortedChunks.Count}/{unmergedChunks.Count}");
+                        Console.Write($"QUEUE sort/merge: {unsortedChunks.Count}/{unmergedChunks.Count}\r");
                         val = unsortedChunks.Count + unmergedChunks.Count;
                     }
                 }
