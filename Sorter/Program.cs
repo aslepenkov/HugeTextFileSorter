@@ -9,8 +9,9 @@ var sortedFilePath = $"{unsortedFilePath}.sorted";
 
 var buff = 1024;
 var createNew = true;
-var size = 10;
-var pool = 50;
+var size = 5;
+var pool = 10;
+var log = true;
 //args sorter.exe y 1000 1024 
 //args sorter.exe n 1024 
 if (args.Length != 0)
@@ -19,6 +20,7 @@ if (args.Length != 0)
     size = createNew ? Int32.Parse(args[1]) : size;
     Int32.TryParse(args[createNew ? 2 : 1], out buff);
     Int32.TryParse(args[createNew ? 3 : 2], out pool);
+    //log = args[createNew ? 4 : 3].Equals("log");
 }
 
 Console.WriteLine($"Sorter.exe| File size: {size} MB. Chunks: {buff} lines. Pool: {pool} tasks");

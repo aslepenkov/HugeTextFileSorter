@@ -3,6 +3,7 @@ namespace SorterCore;
 public class FileSorter
 {
     object _lock = new();
+    public bool enableLog = true;
     private const string TEMP_DIR = ".sortchunks";
     private const string CHUNK_BASE_NAME = "chunk_";
     public int LINES_PER_CHUNK = 1 * (128 * 1024 / 20);//1line ~ 20Bytes. N (MBytes)
@@ -26,6 +27,30 @@ public class FileSorter
     {
         if (!File.Exists(InputPath))
             return false;
+
+
+
+        //monitor
+        var ctn = new CancellationTokenSource();
+        var token = ctn.Token;
+
+        if (enableLog)
+        {
+            var monitorTask = Task.Run(() =>
+            {
+                var val = unsortedChunks.Count + unmergedChunks.Count;
+                while (true)
+                {
+                    token.ThrowIfCancellationRequested();
+
+                    if (val != unsortedChunks.Count + unmergedChunks.Count)
+                    {
+                        Console.WriteLine($"QUEUE sort/merge: {unsortedChunks.Count}/{unmergedChunks.Count}");
+                        val = unsortedChunks.Count + unmergedChunks.Count;
+                    }
+                }
+            }, token);
+        }
 
         //Task to split stream by chunks
         var splitTask = Task.Run(SplitInputFile);
@@ -53,6 +78,9 @@ public class FileSorter
 
         return true;
     }
+
+
+
     private void SplitInputFile()
     {
         Thread.CurrentThread.Name = "SplitInputFile";
@@ -157,6 +185,7 @@ public class FileSorter
             {
                 if (isSingleThread)
                 {
+                    Console.WriteLine($"Sort complete! Saving file...");
                     File.Move(chunk1, OutputPath);
                 }
                 else
@@ -167,11 +196,11 @@ public class FileSorter
             }
 
             //Queue has > 1 elements to be merged
-            if (unmergedChunks.TryDequeue(out chunk2))
+            if (unmergedChunks.TryDequeue(out chunk2) && !string.IsNullOrEmpty(chunk1))
             {
                 var chunkMergeName = Path.Combine(TEMP_DIR, $"{Guid.NewGuid()}.chunkmerge");
 
-                Console.WriteLine($"Merge_{Thread.CurrentThread.ManagedThreadId} {chunk1} {chunk2}. Total unmerged: {unmergedChunks.Count}");
+                // Console.WriteLine($"Merge_{Thread.CurrentThread.ManagedThreadId} 1={chunk1} 2={chunk2}. Total unmerged: {unmergedChunks.Count}");
 
                 using (var chunk1sr = new StreamReader(chunk1))
                 using (var chunk2sr = new StreamReader(chunk2))
@@ -201,8 +230,6 @@ public class FileSorter
                 //delete merged chunks 
                 File.Delete(chunk1);
                 File.Delete(chunk2);
-                chunk1 = null;
-                chunk2 = null;
             }
         }
     }
