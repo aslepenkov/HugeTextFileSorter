@@ -4,7 +4,7 @@
 
 ## Binaries
 
-(link to bin.zip)
+[https://github.com/aslepenkov/HugeTextFileSorter/releases/tag/v1.0.0](https://github.com/aslepenkov/HugeTextFileSorter/releases/tag/v1.0.0)
 
 ## Results
 
