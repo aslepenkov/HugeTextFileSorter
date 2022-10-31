@@ -106,7 +106,6 @@ public class FileSorter
             writer.WriteLine(sb);
         }
         unsortedChunks.Enqueue(chunkFilePath);
-        //Console.WriteLine($"Split-SaveChunk_{Thread.CurrentThread.ManagedThreadId} {chunkFilePath}. Total unsorted: {unsortedChunks.Count}");
         sb.Clear();
     }
 
@@ -129,9 +128,6 @@ public class FileSorter
             var unsortedLines = File.ReadLines(chunkFilePath).ToArray<string>();
             var sortedLines = LineSorter.Sort(unsortedLines, 0, unsortedLines.Length - 1);
             File.WriteAllLines(chunkFilePath, sortedLines);
-
-            // Console.WriteLine($"SortChunks_{Thread.CurrentThread.ManagedThreadId} {chunkFilePath}. Total unmerged: {unmergedChunks.Count}");
-            //Console.WriteLine($"SortChunks_{Thread.CurrentThread.ManagedThreadId} s/m: {unsortedChunks.Count}/{unmergedChunks.Count}");
 
             unmergedChunks.Enqueue(chunkFilePath);
         }
@@ -186,8 +182,6 @@ public class FileSorter
             if (unmergedChunks.TryDequeue(out chunk2) && !string.IsNullOrEmpty(chunk1))
             {
                 var chunkMergeName = Path.Combine(opt.TempDir, $"{Guid.NewGuid()}.chunkmerge");
-
-                // Console.WriteLine($"Merge_{Thread.CurrentThread.ManagedThreadId} 1={chunk1} 2={chunk2}. Total unmerged: {unmergedChunks.Count}");
 
                 using (var chunk1sr = new StreamReader(chunk1))
                 using (var chunk2sr = new StreamReader(chunk2))
