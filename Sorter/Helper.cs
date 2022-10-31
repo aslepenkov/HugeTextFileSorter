@@ -8,7 +8,7 @@ public static class Helper
         Usage: Sorter.exe y 1000 10000 100  
 
         //run output\unsorted.txt file sort with 100 lines chunks and 1000 parralel sort/merge tasks
-        Usage: Sorter.exe n 1000 100 1000    
+        Usage: Sorter.exe n 1000 100 1000
 
         Source: https://github.com/aslepenkov/HugeTextFileSorter
         ";
