@@ -15,15 +15,15 @@
 
 ## Usage
 
-`//Args`
-`Sorter.exe [Generate new file|use existsing: y/n] [File size in MB] (Lines per chunk) (Parralel tasks count)`
+```//Args
+Sorter.exe [Generate new file|use existsing: y/n] [File size in MB] (Lines per chunk) (Parralel tasks count)
 
-`//run 1GB file generation->sort with 10000 lines chunks and 100 parralel sort/merge tasks`
-`Sorter.exe y 1000 10000 100`
+//run 1GB file generation->sort with 10000 lines chunks and 100 parralel sort/merge tasks
+Sorter.exe y 1000 10000 100`
 
-`//run output\unsorted.txt file sort with 100 lines chunks and 1000 parralel sort/merge tasks`
-`Sorter.exe n 1000 100 1000`
-
+//run output\unsorted.txt file sort with 100 lines chunks and 1000 parralel sort/merge tasks
+Sorter.exe n 1000 100 1000
+```
 ## Task
 
 ```
