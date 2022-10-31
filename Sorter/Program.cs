@@ -1,86 +1,50 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
+var testOutputDir = "output";
 
-
-var TestOutputDir = "output";
-var unsortedFilePath = Path.Combine(TestOutputDir, "unsorted.txt");
-var sortedFilePath = $"{unsortedFilePath}.sorted";
-
-
-var buff = 1024;
-var createNew = true;
-var size = 5;
-var pool = 10;
-var log = true;
-//args sorter.exe y 1000 1024 
-//args sorter.exe n 1024 
-if (args.Length != 0)
+if (args.Length == 0)
 {
-    createNew = args[0].Equals("y");
-    size = createNew ? Int32.Parse(args[1]) : size;
-    Int32.TryParse(args[createNew ? 2 : 1], out buff);
-    Int32.TryParse(args[createNew ? 3 : 2], out pool);
-    //log = args[createNew ? 4 : 3].Equals("log");
+    Console.WriteLine(Helper.WelcomeText);
+    Console.ReadKey();
+    return;
 }
 
-Console.WriteLine($"Sorter.exe| File size: {size} MB. Chunks: {buff} lines. Pool: {pool} tasks");
+var sorterOptions = Helper.InitOptions(args, testOutputDir);
+Helper.ShowOptionsMessage(sorterOptions);
 
-// Console.WriteLine(@"Generate new unsorted file? (Y\n)");
-// var l = Console.ReadLine();
-// size = Int32.Parse(l);
-if (createNew)
+if (sorterOptions.CreateNew)
 {
-    PrepareTestDir(TestOutputDir);
-    //Console.WriteLine("Enter size (Default 100MB)");
-    // var l = Console.ReadLine();
-    // size = Int32.Parse(l);
-    Console.WriteLine($"{DateTime.UtcNow}|Creating unsorted file...");
-    var fw = new FileWriter(unsortedFilePath, size);
-    var isGenerated = fw.GenerateFile();
+    Helper.PrepareTestDir(testOutputDir);
+    Helper.ShowMessage();
 
-    if (isGenerated)
-        Console.WriteLine($"{DateTime.UtcNow}|File created: {unsortedFilePath}. Size: {size} MB");
-}
-else
-{
-    if (File.Exists(sortedFilePath))
-        File.Delete(sortedFilePath);
+    var fw = new FileWriter(sorterOptions.InputPath, sorterOptions.FileSizeMByte);
+    var fi = new FileInfo(sorterOptions.InputPath);
 
-    Console.WriteLine(@"(default: output\unsorted.txt)");
+    if (fw.GenerateFile())
+        Helper.ShowSuccessFWMessage(sorterOptions, fi);
 }
+
+
+if (File.Exists(sorterOptions.OutputPath))
+    File.Delete(sorterOptions.OutputPath);
+
 var sw = new Stopwatch();
 sw.Start();
 
 using (var proc = Process.GetCurrentProcess())
 {
-    var fi = new FileInfo(unsortedFilePath);
-    Console.WriteLine($"{DateTime.UtcNow}|Sorting file... size: {fi.Length / 1024 / 1024} MB");
-    var fs = new FileSorter(unsortedFilePath, sortedFilePath);
-    fs.LINES_PER_CHUNK = buff;
-    fs.POOL_SIZE = pool;
-    var isSorted = fs.SortFile();
+    var fi = new FileInfo(sorterOptions.InputPath);
+    Helper.ShowStartSortMessage(fi);
 
-    proc.Refresh();
-    var memUsed = proc.PrivateMemorySize64 / (1024 * 1024);
+    var fs = new FileSorter(sorterOptions);
 
-    if (isSorted)
+    if (fs.SortFile())
     {
-        sw.Stop();
-        Console.WriteLine($"{DateTime.UtcNow}|Sort complete. Memory usage: {memUsed} MB. Time elapsed: {sw.Elapsed}");
+        Helper.ShowSuccessSortMessage(proc, sw);
     }
     else
     {
-        Console.WriteLine($"Iincomplete");
+        Console.WriteLine($"incomplete");
     }
 }
 
-static void PrepareTestDir(string TestOutputDir)
-{
-    if (Directory.Exists(TestOutputDir))
-        Directory.Delete(TestOutputDir, recursive: true);
-
-    // if (Directory.Exists("sortertemp"))
-    //     Directory.Delete("sortertemp", recursive: true);
-
-    Directory.CreateDirectory(TestOutputDir);
-}

@@ -85,8 +85,11 @@ public class Tests
         var resPath = Path.Combine(TestOutputDir, "sorted_lines.txt");
 
         var fw = new FileWriter(path, size);
-        var fs = new FileSorter(path, resPath);
-
+        var fs = new FileSorter(new FileSorterOptions
+        {
+            InputPath = path,
+            OutputPath = resPath
+        });
         var isCreated = fw.GenerateFile();
         Assert.IsTrue(isCreated); // File Created
 
@@ -111,7 +114,11 @@ public class Tests
         var outputRefPath = Path.Combine("testdata", sortedrefFileName);
         var outputResPath = Path.Combine(TestOutputDir, "unsorted.txt.sorted");
 
-        var fs = new FileSorter(inputPath, outputResPath);
+        var fs = new FileSorter(new FileSorterOptions
+        {
+            InputPath = inputPath,
+            OutputPath = outputResPath
+        });
         var isSorted = fs.SortFile();
 
         Assert.IsTrue(isSorted); // File sorted

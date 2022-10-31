@@ -11,7 +11,7 @@
       "preLaunchTask": "build",
       // If you have changed target frameworks, make sure to update the program path.
       "program": "${workspaceFolder}/Sorter/bin/Debug/net6.0/Sorter.dll",
-      "args": [],
+      "args": ["y", "9", "9000", "9"],
       "cwd": "${workspaceFolder}/Sorter",
       // For more information about the 'console' field, see https://aka.ms/VSCode-CS-LaunchJson-Console
       "console": "internalConsole",
