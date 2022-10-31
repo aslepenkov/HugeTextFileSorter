@@ -26,6 +26,9 @@ Sorter.exe n 1000 100 1000
 ```
 ## Task
 
+На входе есть большой текстовый файл, где каждая строка имеет вид Number. String
+Например:
+
 ```
 415. Apple
 30432. Something something something
