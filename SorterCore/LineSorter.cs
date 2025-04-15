@@ -1,41 +1,41 @@
 namespace SorterCore;
 
-public static class LineSorter
+public interface ILineSorter
 {
-    ///Merge Sort
-    public static string[] Sort(string[]? lines, int left, int right)
+    string[] Sort(string[]? lines, int left, int right, ILineComparer comparer);
+}
+
+public class MergeSortLineSorter : ILineSorter
+{
+    public string[] Sort(string[]? lines, int left, int right, ILineComparer comparer)
     {
+        if (lines == null) return Array.Empty<string>();
         if (left < right)
         {
             int middle = left + (right - left) / 2;
-
-            Sort(lines, left, middle);
-            Sort(lines, middle + 1, right);
-
-            MergeLines(lines, left, middle, right);
+            Sort(lines, left, middle, comparer);
+            Sort(lines, middle + 1, right, comparer);
+            MergeLines(lines, left, middle, right, comparer);
         }
         return lines;
     }
 
-    private static void MergeLines(string[] array, int left, int middle, int right)
+    private void MergeLines(string[] array, int left, int middle, int right, ILineComparer comparer)
     {
-        var cmp = new LineComparer();
         var leftArrayLength = middle - left + 1;
         var rightArrayLength = right - middle;
         var leftTempArray = new string[leftArrayLength];
         var rightTempArray = new string[rightArrayLength];
         int i, j;
-
         for (i = 0; i < leftArrayLength; ++i)
             leftTempArray[i] = array[left + i];
         for (j = 0; j < rightArrayLength; ++j)
             rightTempArray[j] = array[middle + 1 + j];
         i = j = 0;
-
         int k = left;
         while (i < leftArrayLength && j < rightArrayLength)
         {
-            if (cmp.Compare(leftTempArray[i], rightTempArray[j]) <= 0)
+            if (comparer.Compare(leftTempArray[i], rightTempArray[j]) <= 0)
             {
                 array[k++] = leftTempArray[i++];
             }

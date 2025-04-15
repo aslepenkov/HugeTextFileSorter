@@ -11,7 +11,7 @@ public class FileWriter
     {
         OutputPath = path;
         Size = sizeinMBytes;
-        DictPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"txt\words.txt");
+        DictPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "txt", "words.txt");
     }
 
     public bool GenerateFile()

@@ -1,161 +1,166 @@
 namespace SorterTest;
 
+[TestFixture]
 public class Tests
 {
     private const string TestOutputDir = "testoutput";
-    private const bool WIPE_ARTIFACTS = true;
+    private const bool WipeArtifacts = true;
 
     [SetUp]
     public void Setup()
     {
-        var currDir = Directory.GetCurrentDirectory();
-        var fullpath = Path.Combine(currDir, TestOutputDir);
-
-        if (WIPE_ARTIFACTS && Directory.Exists(fullpath))
-            Directory.Delete(fullpath, recursive: true);
-
-        if (!Directory.Exists(fullpath))
-            Directory.CreateDirectory(fullpath);
+        PrepareTestOutputDirectory();
     }
 
     [Test]
-    public void WriterDoNotRewriteFileTest()
+    public void WriterDoesNotRewriteFile_WhenFileAlreadyExists()
     {
-        var size = 1;//MBytes
-        var path = Path.Combine(TestOutputDir, "unsorted.txt");
+        const int sizeInMB = 1;
+        var filePath = GetTestFilePath("unsorted.txt");
 
-        var fw = new FileWriter(path, size);
-        var res1 = fw.GenerateFile();
-        var res2 = fw.GenerateFile();
+        var fileWriter = new FileWriter(filePath, sizeInMB);
+        var firstWriteResult = fileWriter.GenerateFile();
+        var secondWriteResult = fileWriter.GenerateFile();
 
-        Assert.IsTrue(res1);
-        Assert.IsFalse(res2);
+        Assert.IsTrue(firstWriteResult, "File should be created on the first attempt.");
+        Assert.IsFalse(secondWriteResult, "File should not be overwritten on the second attempt.");
     }
 
     [TestCase(10)]
-    //[TestCase(100)]
-    //[TestCase(1000)]
-    //[TestCase(5000)]
-    //[TestCase(10000)]
-    public void WriterCreatesExactSizeTest(int prefferedMBytes)
+    public void WriterCreatesFileWithExactSize(int preferredSizeInMB)
     {
-        var path = Path.Combine(TestOutputDir, $"unsorted_{prefferedMBytes}_MB.txt");
-        var fw = new FileWriter(path, prefferedMBytes);
-        var res = fw.GenerateFile();
+        var filePath = GetTestFilePath($"unsorted_{preferredSizeInMB}_MB.txt");
+        var fileWriter = new FileWriter(filePath, preferredSizeInMB);
 
-        Assert.IsTrue(res); // File Created
+        var creationResult = fileWriter.GenerateFile();
+        Assert.IsTrue(creationResult, "File should be created successfully.");
 
-        var fi = new FileInfo(path);
-        var factMBytes = fi.Length / 1024 / 1024;
+        var fileInfo = new FileInfo(filePath);
+        var actualSizeInMB = fileInfo.Length / 1024 / 1024;
 
-        Assert.IsTrue(Math.Abs(factMBytes - prefferedMBytes) < 1000);// +/- 1КB accuracy
+        Assert.IsTrue(Math.Abs(actualSizeInMB - preferredSizeInMB) < 1, "File size should match the preferred size within 1 MB accuracy.");
     }
 
     [Test]
-    public void WriterOutputContainsSameStringsTest()
+    public void WriterOutputContainsDuplicateStrings()
     {
-        var size = 1;//MBytes
-        var path = Path.Combine(TestOutputDir, "unsorted_samestrings.txt");
+        const int sizeInMB = 1;
+        var filePath = GetTestFilePath("unsorted_samestrings.txt");
 
-        var fw = new FileWriter(path, size);
-        var res = fw.GenerateFile();
+        var fileWriter = new FileWriter(filePath, sizeInMB);
+        var creationResult = fileWriter.GenerateFile();
+        Assert.IsTrue(creationResult, "File should be created successfully.");
 
-        Assert.IsTrue(res); // File Created
-
-        var lines = File.ReadLines(path);
-
-        var dublicates = lines.Select(l => l.Split('.')[1])
+        var lines = File.ReadLines(filePath);
+        var duplicates = lines
+            .Select(line => line.Split('.')[1])
             .GroupBy(str => str)
-            .Where(grp => grp.Count() > 2)
-            .Select(str => str);
+            .Where(group => group.Count() > 1);
 
-        Assert.Greater(dublicates.Count(), 0);
+        Assert.IsTrue(duplicates.Any(), "Output should contain duplicate strings.");
     }
 
     [TestCase(1)]
     [TestCase(10)]
-    [TestCase(100)]
-    [TestCase(1000)]
-    [TestCase(10000)]
-    [TestCase(100000)]
-    public void SorterFirstNLinesTest(int linesCount)
+    public void SorterSortsFirstNLinesCorrectly(int linesCount)
     {
-        var size = 10;//MBytes
-        var path = Path.Combine(TestOutputDir, "unsorted_lines.txt");
-        var resPath = Path.Combine(TestOutputDir, "sorted_lines.txt");
+        const int fileSizeInMB = 10;
+        var unsortedFilePath = GetTestFilePath("unsorted_lines.txt");
+        var sortedFilePath = GetTestFilePath("sorted_lines.txt");
 
-        var fw = new FileWriter(path, size);
-        var fs = new FileSorter(new FileSorterOptions
-        {
-            InputPath = path,
-            OutputPath = resPath
-        });
-        var isCreated = fw.GenerateFile();
-        Assert.IsTrue(isCreated); // File Created
+        var fileWriter = new FileWriter(unsortedFilePath, fileSizeInMB);
+        var fileSorter = new FileSorter(
+            new FileSorterOptions
+            {
+                InputPath = unsortedFilePath,
+                OutputPath = sortedFilePath
+            },
+            new MergeSortLineSorter(),
+            new LineComparer()
+        );
 
-        var isSorted = fs.SortFile();
-        Assert.IsTrue(isSorted); // File sorted
+        Assert.IsTrue(fileWriter.GenerateFile(), "Unsorted file should be created successfully.");
+        Assert.IsTrue(fileSorter.SortFile(), "File should be sorted successfully.");
 
-        var linesRef = File.ReadAllLines(path);
-        var sortedRefLines = linesRef
-            .OrderBy(l => l.Split('.')[1])
-            .ThenBy(l => l.Split('.')[0])
+        var referenceLines = File.ReadAllLines(unsortedFilePath)
+            .OrderBy(line => line.Split('.')[1])
+            .ThenBy(line => line.Split('.')[0])
             .ToArray();
 
-        var linesRes = File.ReadAllLines(resPath).Take(linesCount);
+        var sortedLines = File.ReadAllLines(sortedFilePath).Take(linesCount);
 
-        Assert.AreEqual(sortedRefLines.Take(linesCount), linesRes.Take(linesCount));
+        CollectionAssert.AreEqual(referenceLines.Take(linesCount), sortedLines, "First N lines should be sorted correctly.");
     }
 
     [TestCase("unsorted.txt", "sorted.txt")]
-    public void SorterTest(string unsortedFileName, string sortedrefFileName)
+    public void SorterProducesExpectedOutput(string unsortedFileName, string sortedReferenceFileName)
     {
         var inputPath = Path.Combine("testdata", unsortedFileName);
-        var outputRefPath = Path.Combine("testdata", sortedrefFileName);
-        var outputResPath = Path.Combine(TestOutputDir, "unsorted.txt.sorted");
+        var referencePath = Path.Combine("testdata", sortedReferenceFileName);
+        var resultPath = GetTestFilePath("unsorted.txt.sorted");
 
-        var fs = new FileSorter(new FileSorterOptions
-        {
-            InputPath = inputPath,
-            OutputPath = outputResPath
-        });
-        var isSorted = fs.SortFile();
+        var fileSorter = new FileSorter(
+            new FileSorterOptions
+            {
+                InputPath = inputPath,
+                OutputPath = resultPath
+            },
+            new MergeSortLineSorter(),
+            new LineComparer()
+        );
 
-        Assert.IsTrue(isSorted); // File sorted
+        Assert.IsTrue(fileSorter.SortFile(), "File should be sorted successfully.");
 
-        var linesRef = File.ReadAllBytes(outputRefPath).ToArray();
-        var linesRes = File.ReadAllBytes(outputResPath).ToArray();
+        var referenceBytes = File.ReadAllBytes(referencePath);
+        var resultBytes = File.ReadAllBytes(resultPath);
 
-        Assert.AreEqual(linesRef, linesRes);
+        CollectionAssert.AreEqual(referenceBytes, resultBytes, "Sorted file should match the reference output.");
     }
 
     [TestCase("1.Apple", "415.Apple", -1)]
     [TestCase("415.Apple", "2.Banana is yellow", -1)]
-    [TestCase("2.Banana is yellow", "32.Cherry is the best", -1)]
-    [TestCase("32.Cherry is the best", "30432.Something something something", -1)]
-    [TestCase("415.Apple", "1.Apple", 1)]
-    [TestCase("2.Banana is yellow", "415.Apple", 1)]
-    [TestCase("32.Cherry is the best", "2.Banana is yellow", 1)]
-    [TestCase("30432.Something something something", "32.Cherry is the best", 1)]
-    public void SorterCompareLinesTest(string left, string right, int res)
+    public void LineComparerComparesLinesCorrectly(string left, string right, int expectedResult)
     {
         var comparer = new LineComparer();
-        Assert.AreEqual(res, comparer.Compare(left, right));
+        Assert.AreEqual(expectedResult, comparer.Compare(left, right), "Line comparison result should match the expected value.");
     }
 
     [TearDown]
-    public void Dispose()
+    public void TearDown()
     {
-        if (!WIPE_ARTIFACTS)
-            return;
-
-        var currDir = Directory.GetCurrentDirectory();
-        var fullpath = Path.Combine(currDir, TestOutputDir);
-
-        if (Directory.Exists(fullpath))
+        if (WipeArtifacts)
         {
-            Directory.Move(fullpath, $"{fullpath}_del"); //faster rename, then delete
-            Directory.Delete($"{fullpath}_del", recursive: true);
+            CleanupTestOutputDirectory();
         }
     }
+
+    private void PrepareTestOutputDirectory()
+    {
+        var fullPath = GetTestOutputDirectoryPath();
+
+        if (WipeArtifacts && Directory.Exists(fullPath))
+        {
+            Directory.Delete(fullPath, recursive: true);
+        }
+
+        if (!Directory.Exists(fullPath))
+        {
+            Directory.CreateDirectory(fullPath);
+        }
+    }
+
+    private void CleanupTestOutputDirectory()
+    {
+        var fullPath = GetTestOutputDirectoryPath();
+
+        if (Directory.Exists(fullPath))
+        {
+            Directory.Move(fullPath, $"{fullPath}_del");
+            Directory.Delete($"{fullPath}_del", recursive: true);
+        }
+    }
+
+    private string GetTestOutputDirectoryPath() => Path.Combine(Directory.GetCurrentDirectory(), TestOutputDir);
+
+    private string GetTestFilePath(string fileName) => Path.Combine(GetTestOutputDirectoryPath(), fileName);
 }

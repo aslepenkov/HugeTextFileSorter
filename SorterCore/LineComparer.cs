@@ -1,6 +1,8 @@
 namespace SorterCore;
 
-public class LineComparer : IComparer<string>
+public interface ILineComparer : IComparer<string> {}
+
+public class LineComparer : ILineComparer
 {
     public int Compare(string? left, string? right)
     {

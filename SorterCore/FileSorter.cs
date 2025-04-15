@@ -2,69 +2,64 @@ namespace SorterCore;
 
 public class FileSorter
 {
-    object _lock = new();
-    private FileSorterOptions opt { get; }
-    private volatile bool IsSplitDone = false;
-    private volatile bool IsSortDone = false;
-    private ConcurrentQueue<string> unsortedChunks = new ConcurrentQueue<string>();
-    private ConcurrentQueue<string> unmergedChunks = new ConcurrentQueue<string>();
+    private readonly object _lock = new();
+    private readonly FileSorterOptions _options;
+    private readonly ILineSorter _lineSorter;
+    private readonly ILineComparer _lineComparer;
+    private volatile bool _isSplitDone;
+    private volatile bool _isSortDone;
+    private readonly ConcurrentQueue<string> _unsortedChunks = new();
+    private readonly ConcurrentQueue<string> _unmergedChunks = new();
 
-    public FileSorter(FileSorterOptions sorterOptions)
+    public FileSorter(FileSorterOptions options, ILineSorter lineSorter, ILineComparer lineComparer)
     {
-        opt = sorterOptions;
-        PrepareTempDir();
+        _options = options;
+        _lineSorter = lineSorter;
+        _lineComparer = lineComparer;
+        PrepareTempDirectory();
     }
 
     public bool SortFile()
     {
-        if (string.IsNullOrEmpty(opt.InputPath) || string.IsNullOrEmpty(opt.OutputPath))
+        if (string.IsNullOrEmpty(_options.InputPath) || string.IsNullOrEmpty(_options.OutputPath))
             return false;
 
-        if (!File.Exists(opt.InputPath))
+        if (!File.Exists(_options.InputPath))
             return false;
 
-        //Queue monitor unsortedChunks/unmergedChunks count
-        var monitorTask = Task.Run(MonitorQueue);
-
-        //Task to split stream by chunks
+        var cts = new CancellationTokenSource();
+        var monitorTask = Task.Run(() => MonitorQueue(cts.Token));
         var splitTask = Task.Run(SplitInputFile);
 
-        //Task Pool to preSort chunks
-        var sortTaskPool = new Task[opt.PoolSize];
+        var sortTasks = Enumerable.Range(0, _options.PoolSize)
+            .Select(_ => Task.Run(SortChunks))
+            .ToArray();
 
-        //Task Pool to preSort chunks
-        var msortTaskPool = new Task[opt.PoolSize];
-
-        for (var i = 0; i < opt.PoolSize; i++)
-        {
-            sortTaskPool[i] = Task.Run(SortChunks);
-            msortTaskPool[i] = Task.Run(() =>
-            {
-                SortMerge();
-            });
-        }
+        var mergeTasks = Enumerable.Range(0, _options.PoolSize)
+            .Select(_ => Task.Run(() => SortMerge()))
+            .ToArray();
 
         Task.WaitAll(splitTask);
-        Task.WaitAll(sortTaskPool);
-        Task.WaitAll(msortTaskPool);
+        Task.WaitAll(sortTasks);
+        Task.WaitAll(mergeTasks);
 
-        //final merge
-        SortMerge(isSingleThread: true);
-
+        SortMerge();
+        cts.Cancel();
         return true;
     }
 
-    private void MonitorQueue()
+    private void MonitorQueue(CancellationToken token)
     {
-        Console.WriteLine();
-        var val = unsortedChunks.Count + unmergedChunks.Count;
-        while (true)
+        var previousCount = _unsortedChunks.Count + _unmergedChunks.Count;
+        while (!token.IsCancellationRequested)
         {
-            if (val != unsortedChunks.Count + unmergedChunks.Count)
+            var currentCount = _unsortedChunks.Count + _unmergedChunks.Count;
+            if (previousCount != currentCount)
             {
-                Console.Write($"QUEUE sort/merge: {unsortedChunks.Count}/{unmergedChunks.Count}        \r");
-                val = unsortedChunks.Count + unmergedChunks.Count;
+                Console.Write($"QUEUE sort/merge: {_unsortedChunks.Count}/{_unmergedChunks.Count}        \r");
+                previousCount = currentCount;
             }
+            Thread.Sleep(100); // Reduce CPU usage
         }
     }
 
@@ -72,160 +67,125 @@ public class FileSorter
     {
         Thread.CurrentThread.Name = "SplitInputFile";
         var lineCounter = 0;
-        var idx = 0;
-        var sb = new StringBuilder();
+        var chunkIndex = 0;
+        var stringBuilder = new StringBuilder();
 
-        foreach (var line in File.ReadLines(opt.InputPath))
+        foreach (var line in File.ReadLines(_options.InputPath))
         {
             if (!string.IsNullOrEmpty(line))
-                sb.AppendLine(line);
+                stringBuilder.AppendLine(line);
 
-            if (++lineCounter % opt.MaxLinesPerChunk == 0)
-            {   //store buffer into chunk
+            if (++lineCounter % _options.MaxLinesPerChunk == 0)
+            {
+                SaveChunk(stringBuilder, chunkIndex++);
                 lineCounter = 0;
-                SaveChunk(sb, idx++);
             }
         }
 
-        //If smaller than buffer size
-        if (sb.Length > 0)
-            SaveChunk(sb);
+        if (stringBuilder.Length > 0)
+            SaveChunk(stringBuilder);
 
         lock (_lock)
         {
-            IsSplitDone = true;
+            _isSplitDone = true;
         }
     }
 
-    private void SaveChunk(StringBuilder sb, int idx = -1)
+    private void SaveChunk(StringBuilder stringBuilder, int index = -1)
     {
-        var chunkFilePath = Path.Combine(opt.TempDir, $"{opt.ChunkBaseName}{idx}.chunk");
-        using (var writeStream = File.Create(chunkFilePath))
-        using (var writer = new StreamWriter(writeStream))
-        {
-            writer.WriteLine(sb);
-        }
-        unsortedChunks.Enqueue(chunkFilePath);
-        sb.Clear();
+        var chunkFilePath = Path.Combine(_options.TempDir, $"{_options.ChunkBaseName}{(index == -1 ? Guid.NewGuid().ToString() : index.ToString())}.chunk");
+        File.WriteAllText(chunkFilePath, stringBuilder.ToString());
+        _unsortedChunks.Enqueue(chunkFilePath);
+        stringBuilder.Clear();
     }
 
     private void SortChunks()
     {
-        string? chunkFilePath;
-        bool isSplitDone = false;
-
-        while (unsortedChunks.TryDequeue(out chunkFilePath) || !isSplitDone) //while queue has chunks to sort
+        while (_unsortedChunks.TryDequeue(out var chunkFilePath) || !_isSplitDone)
         {
             if (string.IsNullOrEmpty(chunkFilePath))
             {
                 lock (_lock)
                 {
-                    isSplitDone = IsSplitDone;
+                    if (_isSplitDone)
+                        break;
                 }
                 continue;
             }
 
-            var unsortedLines = File.ReadLines(chunkFilePath).ToArray<string>();
-            var sortedLines = LineSorter.Sort(unsortedLines, 0, unsortedLines.Length - 1);
+            var lines = File.ReadAllLines(chunkFilePath);
+            var sortedLines = _lineSorter.Sort(lines, 0, lines.Length - 1, _lineComparer);
             File.WriteAllLines(chunkFilePath, sortedLines);
-
-            unmergedChunks.Enqueue(chunkFilePath);
+            _unmergedChunks.Enqueue(chunkFilePath);
         }
-
 
         lock (_lock)
         {
-            IsSortDone = true;
+            _isSortDone = true;
         }
     }
 
-    private void SortMerge(bool isSingleThread = false)
+    private void SortMerge()
     {
-        var lc = new LineComparer();
-        string? chunk1, chunk2;
-        var isSortDone = false;
-
-        while (unmergedChunks.TryDequeue(out chunk1) || !isSortDone)
+        while (_unmergedChunks.TryDequeue(out var chunk1) || !_isSortDone)
         {
             lock (_lock)
             {
-                isSortDone = IsSortDone;
+                if (_isSortDone && string.IsNullOrEmpty(chunk1))
+                    break;
             }
 
-            //Queue is empty&clean
-            if (!isSortDone && string.IsNullOrEmpty(chunk1))
+            if (!_unmergedChunks.TryDequeue(out var chunk2))
+            {
+                if (_isSortDone)
+                {
+                    File.Move(chunk1, _options.OutputPath);
+                    break;
+                }
+
+                _unmergedChunks.Enqueue(chunk1);
                 continue;
-
-            //Queue has 1 element. To be filled
-            if (!isSortDone && !string.IsNullOrEmpty(chunk1) && !unmergedChunks.TryPeek(out chunk2))
-            {
-                unmergedChunks.Enqueue(chunk1);
-                continue;
             }
 
-            //Queue has 1 last element. => Save results&exit
-            if (isSortDone && !string.IsNullOrEmpty(chunk1) && !unmergedChunks.TryPeek(out chunk2))
+            var mergedChunkPath = Path.Combine(_options.TempDir, $"{Guid.NewGuid()}.chunkmerge");
+            MergeChunks(chunk1, chunk2, mergedChunkPath, _lineComparer);
+
+            _unmergedChunks.Enqueue(mergedChunkPath);
+            File.Delete(chunk1);
+            File.Delete(chunk2);
+        }
+    }
+
+    private void MergeChunks(string chunk1, string chunk2, string outputPath, ILineComparer comparer)
+    {
+        using var reader1 = new StreamReader(chunk1);
+        using var reader2 = new StreamReader(chunk2);
+        using var writer = new StreamWriter(outputPath);
+
+        var line1 = reader1.ReadLine();
+        var line2 = reader2.ReadLine();
+
+        while (line1 != null || line2 != null)
+        {
+            if (line2 == null || (line1 != null && comparer.Compare(line1, line2) <= 0))
             {
-                if (isSingleThread)
-                {
-                    Console.WriteLine($"Sort complete! Saving file...");
-                    File.Move(chunk1, opt.OutputPath);
-                }
-                else
-                {
-                    unmergedChunks.Enqueue(chunk1);
-                }
-                break;
+                writer.WriteLine(line1);
+                line1 = reader1.ReadLine();
             }
-
-            //Queue has > 1 elements to be merged
-            if (unmergedChunks.TryDequeue(out chunk2) && !string.IsNullOrEmpty(chunk1))
+            else
             {
-                var chunkMergeName = Path.Combine(opt.TempDir, $"{Guid.NewGuid()}.chunkmerge");
-
-                using (var chunk1sr = new StreamReader(chunk1))
-                using (var chunk2sr = new StreamReader(chunk2))
-                {
-                    var lineL = chunk1sr.ReadLine();
-                    var lineR = chunk2sr.ReadLine();
-
-                    using (var mergedChunksr = new StreamWriter(chunkMergeName))
-                    {
-                        while (!string.IsNullOrEmpty(lineL) || !string.IsNullOrEmpty(lineR))
-                        {
-                            if (lc.Compare(lineL, lineR) < 0)
-                            {
-                                mergedChunksr.WriteLine(lineL);
-                                lineL = chunk1sr.ReadLine();
-                            }
-                            else if (!string.IsNullOrEmpty(lineR))
-                            {
-                                mergedChunksr.WriteLine(lineR);
-                                lineR = chunk2sr.ReadLine();
-                            }
-
-                        }
-                    }
-                    unmergedChunks.Enqueue(chunkMergeName);
-                }
-                //delete merged chunks 
-                File.Delete(chunk1);
-                File.Delete(chunk2);
+                writer.WriteLine(line2);
+                line2 = reader2.ReadLine();
             }
         }
     }
 
-    private void PrepareTempDir()
+    private void PrepareTempDirectory()
     {
-        if (Directory.Exists(opt.TempDir))
+        if (Directory.Exists(_options.TempDir))
         {
-            Directory.Move(opt.TempDir, $"{opt.TempDir}_del");
-            Directory.Delete($"{opt.TempDir}_del", recursive: true);
-            Directory.CreateDirectory(opt.TempDir);
+            Directory.Delete(_options.TempDir, recursive: true);
         }
-        else
-        {
-            Directory.CreateDirectory(opt.TempDir);
-        }
+        Directory.CreateDirectory(_options.TempDir);
     }
 }

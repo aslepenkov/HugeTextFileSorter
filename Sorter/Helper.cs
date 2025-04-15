@@ -13,17 +13,18 @@ public static class Helper
         Source: https://github.com/aslepenkov/HugeTextFileSorter
         ";
 
-    public static void PrepareTestDir(string TestOutputDir)
+    public static void PrepareTestDir(string TestOutputDir, ILogger logger)
     {
         if (Directory.Exists(TestOutputDir))
             Directory.Delete(TestOutputDir, recursive: true);
 
         Directory.CreateDirectory(TestOutputDir);
+        logger.LogInformation($"Preparing test directory: {TestOutputDir}");
     }
 
     public static FileSorterOptions InitOptions(string[] args, string testOutputDir)
     {
-        var unsortedFilePath = Path.Combine(testOutputDir, "unsorted.txt");
+        var unsortedFilePath = Path.combine(testOutputDir, "unsorted.txt");
         var sortedFilePath = $"{unsortedFilePath}.sorted";
         var buff = 1;
         var pool = 1;
@@ -41,30 +42,30 @@ public static class Helper
             OutputPath = sortedFilePath
         };
     }
-    public static void ShowSuccessSortMessage(Process proc, Stopwatch sw)
+    public static void ShowSuccessSortMessage(Process proc, Stopwatch sw, ILogger logger)
     {
         sw.Stop();
         proc.Refresh();
         var memUsed = proc.PrivateMemorySize64 / 1024 / 1024;
-        Console.WriteLine($"{DateTime.UtcNow}|Sort complete. Memory usage: {memUsed} MB. Time elapsed: {sw.Elapsed}");
+        logger.LogInformation($"{DateTime.UtcNow}|Sort complete. Memory usage: {memUsed} MB. Time elapsed: {sw.Elapsed}");
     }
 
-    public static void ShowStartSortMessage(FileInfo fi)
+    public static void ShowStartSortMessage(FileInfo fi, ILogger logger)
     {
-        Console.WriteLine($"{DateTime.UtcNow}|Sorting file... size: {fi.Length / 1024 / 1024} MB");
+        logger.LogInformation($"{DateTime.UtcNow}|Sorting file... size: {fi.Length / 1024 / 1024} MB");
     }
-    public static void ShowSuccessFWMessage(FileSorterOptions sorterOptions, FileInfo fi)
+    public static void ShowSuccessFWMessage(FileSorterOptions sorterOptions, FileInfo fi, ILogger logger)
     {
-        Console.WriteLine($"{DateTime.UtcNow}|File created: {sorterOptions.InputPath}. Size: {fi.Length / 1024 / 1024} MB");
+        logger.LogInformation($"{DateTime.UtcNow}|File created: {sorterOptions.InputPath}. Size: {fi.Length / 1024 / 1024} MB");
     }
 
-    public static void ShowMessage()
+    public static void ShowMessage(ILogger logger)
     {
-        Console.WriteLine($"{DateTime.UtcNow}|Creating unsorted file...");
+        logger.LogInformation($"{DateTime.UtcNow}|Creating unsorted file...");
     }
-    public static void ShowOptionsMessage(FileSorterOptions sorterOptions)
+    public static void ShowOptionsMessage(FileSorterOptions sorterOptions, ILogger logger)
     {
         var fileSizeText = sorterOptions.CreateNew ? $"File size: {sorterOptions.FileSizeMByte} MB. " : string.Empty;
-        Console.WriteLine($"Sorter.exe| {fileSizeText}Chunks: {sorterOptions.MaxLinesPerChunk} lines. Pool: {sorterOptions.PoolSize} tasks");
+        logger.LogInformation($"Sorter.exe| {fileSizeText}Chunks: {sorterOptions.MaxLinesPerChunk} lines. Pool: {sorterOptions.PoolSize} tasks");
     }
 }
